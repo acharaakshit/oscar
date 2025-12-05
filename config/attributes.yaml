@@ -1,0 +1,3 @@
+main_attributes: [gender, race, age]
+disease_attributes: [disease]
+acquisition_attributes: [description, type]

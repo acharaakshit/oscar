@@ -1,0 +1,16 @@
+multifield: [ADNI, OASIS, IXI]
+datasets: [ADNI, OASIS, HCP, A4, UKBB, IXI]
+
+# metadata files
+metadata: attributes.csv
+ADNI_race: race.csv # race information is provided separately for ADNI, should be downloaded from the LONI portal
+OASIS_cognition: cognition.csv
+# HCP restricted data access
+HCP_restricted: attributes_restricted.csv
+
+# field strength file --ADNI
+ADNI_1.5T: ADNI_1.5T.csv
+ADNI_3T: ADNI_3T.csv
+
+
+

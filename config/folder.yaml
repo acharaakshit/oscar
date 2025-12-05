@@ -1,0 +1,7 @@
+processed: processed
+preprocessed: preprocessed
+explain: explain
+metadata: METADATA
+foundation: foundation_models
+checkpoints: saved_data/models
+results: results

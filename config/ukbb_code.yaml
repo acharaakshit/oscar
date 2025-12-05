@@ -1,0 +1,12 @@
+subject: eid
+gender: 31-0.0 
+age: 21003-2.0 # imaging instance
+race: 21000
+race_b1: 21000-0.0
+race_b2: 21000-1.0
+race_b3: 21000-3.0 # backup instances
+race_i: 21000-2.0 # imaging instance
+# attend: 53-2.0 # date attended
+# yob: 34-0.0 # yob
+gender_allowed: [0, 1]
+race_allowed: [1, 1001, 10002, 1003, 4, 4001, 4002, 4003, 5, 3001, 3002, 3003]

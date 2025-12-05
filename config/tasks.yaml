@@ -1,0 +1,12 @@
+classification: [gender, race, disease, diseasegender, diseaseage, diseaserace, diseasedescription, diseasetype]
+regression: [age]
+disease: [disease, diseasegender, diseaserace, diseaseage, diseasedescription, diseasetype]
+shortcut: [diseasegender, diseaserace, diseaseage]
+baseline: [gender, race]
+multiclass: [UKBB]
+
+disease_test: 0.45
+disease_val: 0.1
+shortcut_swap_gender: 0.02 # 2%  swap for extreme shortcuts
+shortcut_swap_race: 0.3
+fixed_test_frac: 0.15

@@ -1,0 +1,19 @@
+swintransformer: swintransformer
+swin2d: swin_tiny_patch4_window7_224
+resnet: resnet50.am_in1k
+mobilenet: mobilenetv2_100
+vit: vit
+vgg: vgg16
+vggbn: vgg16_bn.tv_in1k
+densenet  : densenet121.tv_in1k
+mobilenet: mobilenetv3_large_100.ra_in1k
+mobilenet3d: mobilenetv2_140.ra_in1k
+efficientnet: efficientnet_b4
+mednext: mednext
+convnext: timm/convnext_base.fb_in1k
+maxvit: maxvit_small_tf_512
+inception: inception_v3.tv_in1k
+
+pretrained: [resnet, convnext]
+foundation: [medvae, brainsegfounder]
+early_epochs: {swintransformer: 50, resnet: 50, convnext: 100, vit: 150, mobilenet3d: 50, mobilenet: 50}

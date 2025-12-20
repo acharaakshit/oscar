@@ -97,12 +97,12 @@ class Classifier2D(L.LightningModule):
         if self.shuffle:
             if self.shuffle_gen is None or self.shuffle_gen.device != x.device:
                 self.shuffle_gen = torch.Generator(device=x.device).manual_seed(self.shuffle_seed)
-            x = self.rcs_img_mask
-            H, W = x.shape[-2:]
+            rcs_mitig = self.rcs_img_mask
+            H, W = rcs_mitig.shape[-2:]
             # sample shifts from the far halves only
-            dy = int(torch.randint(low=H//2, high=H, size=(1,), device=x.device, generator=self.shuffle_gen))
-            dx = int(torch.randint(low=W//2, high=W, size=(1,), device=x.device, generator=self.shuffle_gen))
-            m  = torch.roll(x, shifts=(dy, dx), dims=(-2, -1))
+            dy = int(torch.randint(low=H//2, high=H, size=(1,), device=rcs_mitig.device, generator=self.shuffle_gen))
+            dx = int(torch.randint(low=W//2, high=W, size=(1,), device=rcs_mitig.device, generator=self.shuffle_gen))
+            m  = torch.roll(rcs_mitig, shifts=(dy, dx), dims=(-2, -1))
 
 
         if m.shape[-2:] != (Hf, Wf):

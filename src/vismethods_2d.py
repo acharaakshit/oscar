@@ -128,26 +128,14 @@ def image_bootstrap_ci(A_imgs, B_imgs, C_imgs, corr_func, B=2000, agg="median", 
     lo, hi = np.percentile(stats, [2.5, 97.5])
     return lo, hi
 
-
-# region level statistics
-def residualise(y, x):
-    y = np.asarray(y).reshape(-1)
-    X = np.asarray(x)
-    if X.ndim == 1:
-        X = X.reshape(-1, 1)
-    X = np.c_[np.ones(len(X)), X]
-    beta, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
-    return y - X @ beta
-
-def per_region_pcs(R_BI, R_BA, R_PA):
+def per_region_rcs(R_TS, R_BA, R_SA):
     # Partial residuals
-    u = residualise(R_BI, R_BA)
-    v = residualise(R_PA, R_BA)
+    u, v = _residualise(R_TS, R_SA, R_BA)
     # Standardize
     u = (u - u.mean()) / (u.std(ddof=1) + 1e-12)
     v = (v - v.mean()) / (v.std(ddof=1) + 1e-12)
-    pcs = u * v
-    return pcs
+    rcs = u * v
+    return rcs
 
 def main(args):
     global corrmap
@@ -248,7 +236,7 @@ def main(args):
 
                                     assert region == len(R1) == len(R2) == len(R3)
                                     
-                                    pcs_obs = per_region_pcs(R_TS=R1, R_BA=R2, R_SA=R3)
+                                    pcs_obs = per_region_rcs(R_TS=R1, R_BA=R2, R_SA=R3)
                                     for rid, pcs in zip(range(len(pcs_obs)), pcs_obs):
                                         pcs_rows.append({
                                             "region_id": rid,

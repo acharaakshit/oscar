@@ -47,8 +47,16 @@ export PYTHONPATH=$PROJECTDIR
 - RCS mitigation: `use_rcs_consistency`, `rcs_mask`, `up`, `down`, `shuffle_seed`.
 - Stability tooling: `explain_2d/` (2D), `explain/` (3D).
 
-## Citation
+## Citations
+Please cite the following papers if you find them useful for your research.
 ```bibtex
+@article{achara2025localising,
+  title={Localising Shortcut Learning in Pixel Space via Ordinal Scoring Correlations for Attribution Representations (OSCAR)},
+  author={Achara, Akshit and Triantafillou, Peter and Puyol-Ant{\'o}n, Esther and Hammers, Alexander and King, Andrew P},
+  journal={arXiv preprint arXiv:2512.18888},
+  year={2025}
+}
+
 @inproceedings{achara2025invisible,
   title={Invisible attributes, visible biases: Exploring demographic shortcuts in mri-based alzheimer’s disease classification},
   author={Achara, Akshit and Anton, Esther Puyol and Hammers, Alexander and King, Andrew P and Alzheimers Disease Neuroimaging Initiative},

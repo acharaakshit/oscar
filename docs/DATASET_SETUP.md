@@ -1,12 +1,13 @@
 ## Overview
-- Data root: set `PREFIX=/path/to/datasets`. All datasets live under `PREFIX/<DATASET>_<FS>/` (FS = field strength, e.g., `3T` or `1.5T`).
+- Data root: set `PREFIX=/path/to/datasets`. Most MRI datasets live under `PREFIX/<DATASET>_<FS>/` (FS = field strength, e.g., `3T` or `1.5T`).
 - Processed NIfTI volumes are written to `PREFIX/<DATASET>_<FS>/processed/` by `process/create_data_objects.py`.
 - Metadata CSVs are written to `PREFIX/METADATA/<DATASET>_ATTRIBUTES.csv` by `process/metadata.py` and are consumed by training/eval scripts.
 - Folder names come from `config/folder.yaml` (`processed`, `preprocessed`, `metadata`); adjust there if your layout differs.
+- HCP is the main exception: raw scans are read from `PREFIX/HCP/<SUBJECT>/...`, while metadata is expected under `PREFIX/HCP_3T/`.
 
 ## Common steps
 1) Place preprocessed brain-extracted NIfTIs under `PREFIX/<DATASET>_<FS>/<preprocessed>/` (defaults to `preprocessed/`).
-2) Ensure raw metadata files listed below are present under each dataset folder (e.g., `PREFIX/ADNI_3T/WORKING.csv`).
+2) Ensure the dataset-specific metadata files described below are present under each dataset folder.
 3) Run metadata aggregation:
 ```
 PYTHONPATH=$PROJECTDIR python -u process/metadata.py --dataset <DATASET>
@@ -21,7 +22,7 @@ Repeat for `--FS 1.5T` where applicable.
 
 ### ADNI (multifield: 3T, 1.5T)
 - Preprocessed scans: `PREFIX/ADNI_<FS>/preprocessed/**/<IMAGE_ID>_MNI_Brain.nii.gz`.
-- Required metadata: `WORKING.csv`, `race.csv` (from LONI), field-strength CSV (`ADNI_<FS>.csv`) under `PREFIX/ADNI_<FS>/`.
+- Required metadata: the main ADNI report CSV, `race.csv` (from LONI), and the field-strength CSV (`ADNI_<FS>.csv`) under `PREFIX/ADNI_<FS>/`.
 - `process/metadata.py` filters to White/Black, maps `gender/race/age/disease_group`, and enforces field strength per scan.
 
 ### OASIS (multifield: 3T, 1.5T)
@@ -54,7 +55,7 @@ Repeat for `--FS 1.5T` where applicable.
 - Maps Group to `CN` vs `AD` label for consistency with other scripts.
 
 ### 2D datasets (CelebA, CheXpert)
-- Place standard image folders/CSVs under `PREFIX/<dataset>/` following the original dataset structure. Training scripts expect dataset-specific loaders defined in `src/data.py`; ensure paths there point to your layout.
+- Place standard image folders/CSVs under `PREFIX/<dataset>/` following the original dataset structure. Training scripts use the dataset-specific loaders in `src/datasets2d.py`; ensure paths there point to your layout.
 
 ## Sanity checks
 - After `process/metadata.py`, inspect `PREFIX/METADATA/<DATASET>_ATTRIBUTES.csv` for expected columns (e.g., `image_id,subject_id,scan,gender,race,age[,disease_group,...]`).

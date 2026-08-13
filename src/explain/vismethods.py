@@ -1,4 +1,4 @@
-from dataset import SingleClassDataset
+from .dataset import SingleClassDataset
 import create_splits
 from tqdm import tqdm
 import numpy as np

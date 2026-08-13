@@ -8,8 +8,8 @@ from scipy.stats import rankdata
 import pickle
 from scipy.ndimage import mean as region_mean
 from datasets2d import get_biased_celeba_splits, get_biased_chexpert_splits
-from partition import square_atlas_grid, kmeans_partition, build_ref_edge_image, superpixel_partition
-from utils import saliency_score_percent
+from .partition import square_atlas_grid, kmeans_partition, build_ref_edge_image, superpixel_partition
+from .utils import saliency_score_percent
 import logging
 
 logging.basicConfig(level=logging.INFO)

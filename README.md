@@ -43,8 +43,8 @@ The paper covers CelebA, CheXpert, and ADNI. The code in this repository current
 
 ```text
 config/                  YAML config for folders, tasks, and model aliases
-docs/DATASET_SETUP.md    MRI dataset preparation notes
-process/                 MRI metadata creation and volume preprocessing
+docs/DATASET_SETUP.md    Dataset preparation details
+process/                 MRI metadata creation and volume preprocessing, Waterbirds generation
 scripts/                 Example shell wrappers
 src/train*.py            2D/3D model training
 src/evaluation*.py       2D/3D evaluation and 2D mitigation
@@ -61,15 +61,15 @@ cd oscar
 conda create -n oscar python=3.10 -y
 conda activate oscar
 pip install -r requirements.txt
+pip install -e .
 
-export PROJECTDIR=$PWD
-export PREFIX=/path/to/datasets
-export PYTHONPATH=$PROJECTDIR/src:$PROJECTDIR
+source setup.sh
 ```
 
 Notes:
 
 - `PREFIX` is the root folder path that holds dataset folders, checkpoints, attribution maps, and results.
+- `PROJECTDIR` is the repository root used by scripts to find config files. Edit `setup.sh` to set your project root and data root.
 
 ## Datasets
 
@@ -101,9 +101,9 @@ The MRI preprocessing and metadata pipeline is driven by:
 Example with CelebA and ResNet:
 
 ```bash
-python -u src/train_2d.py --dataset celeba_gender --model resnet --in-channels 3 --batch-size 32 --seed 0
-python -u src/train_2d.py --dataset celeba_gender --model resnet --baseline --in-channels 3 --batch-size 32 --seed 0
-python -u src/train_2d.py --dataset celeba_gender --model resnet --baseline --attribute --in-channels 3 --batch-size 32 --seed 0
+python -m train_2d --dataset celeba_gender --model resnet --in-channels 3 --batch-size 32 --seed 0
+python -m train_2d --dataset celeba_gender --model resnet --baseline --in-channels 3 --batch-size 32 --seed 0
+python -m train_2d --dataset celeba_gender --model resnet --baseline --attribute --in-channels 3 --batch-size 32 --seed 0
 ```
 
 For the varying-shortcut-strength experiments used in the paper, use [`src/train_2d_samples_exp.py`](src/train_2d_samples_exp.py) with `--bias-samples-train` and `--bias-samples-val`.
@@ -111,9 +111,9 @@ For the varying-shortcut-strength experiments used in the paper, use [`src/train
 ### 2D: generate attribution maps
 
 ```bash
-python -u src/explain_2d/vismethods.py --dataset celeba_gender --model resnet --method GradCAM --seed 0
-python -u src/explain_2d/vismethods.py --dataset celeba_gender --model resnet --baseline --method GradCAM --seed 0
-python -u src/explain_2d/vismethods.py --dataset celeba_gender --model resnet --baseline --attribute --method GradCAM --seed 0
+python -m explain_2d.vismethods --dataset celeba_gender --model resnet --method GradCAM --seed 0
+python -m explain_2d.vismethods --dataset celeba_gender --model resnet --baseline --method GradCAM --seed 0
+python -m explain_2d.vismethods --dataset celeba_gender --model resnet --baseline --attribute --method GradCAM --seed 0
 ```
 
 Supported attribution methods in the checked-in 2D pipeline are:
@@ -124,7 +124,7 @@ Supported attribution methods in the checked-in 2D pipeline are:
 ### 2D: convert attribution maps to regional rank profiles
 
 ```bash
-python -u src/explain_2d/attribution_statistics.py \
+python -m explain_2d.attribution_statistics \
   --dataset celeba_gender \
   --model resnet \
   --method GradCAM \
@@ -152,7 +152,7 @@ The checked-in 2D correlation sweep in [`src/vismethods_2d.py`](src/vismethods_2
 ### 2D: compute OSCAR correlations and RCS
 
 ```bash
-python -u src/vismethods_2d.py --outfile celeba_resnet --seeds 1
+python -m vismethods_2d --outfile celeba_resnet --seeds 1
 ```
 
 Important:
@@ -166,13 +166,13 @@ Important:
 Standard evaluation:
 
 ```bash
-python -u src/evaluation_2d.py --dataset celeba_gender --model resnet --in-channels 3 --seed 0
+python -m evaluation_2d --dataset celeba_gender --model resnet --in-channels 3 --seed 0
 ```
 
 RCS-based mitigation with threshold selection:
 
 ```bash
-python -u src/evaluation_2d_samples_exp.py \
+python -m evaluation_2d_samples_exp \
   --dataset celeba_gender \
   --model resnet \
   --seed 0 \
@@ -191,48 +191,48 @@ python -u src/evaluation_2d_samples_exp.py \
 Follow [`docs/DATASET_SETUP.md`](docs/DATASET_SETUP.md), then run:
 
 ```bash
-python -u process/metadata.py --dataset ADNI
-python -u process/create_data_objects.py --dataset ADNI --FS 3T
-python -u process/create_data_objects.py --dataset ADNI --FS 1.5T
+python -m process.metadata --dataset ADNI
+python -m process.create_data_objects --dataset ADNI --FS 3T
+python -m process.create_data_objects --dataset ADNI --FS 1.5T
 ```
 
 ### 3D: train BA, TS, and SA
 
 ```bash
-python -u src/train.py --dataset ADNI --model resnet --in-channels 1 --seed 0
-python -u src/train.py --dataset ADNI --model resnet --baseline --in-channels 1 --seed 0
-python -u src/train.py --dataset ADNI --model resnet --baseline --attribute --in-channels 1 --seed 0
+python -m train --dataset ADNI --model resnet --in-channels 1 --seed 0
+python -m train --dataset ADNI --model resnet --baseline --in-channels 1 --seed 0
+python -m train --dataset ADNI --model resnet --baseline --attribute --in-channels 1 --seed 0
 ```
 
 ### 3D: generate and register attributions
 
 ```bash
-python -u src/explain/vismethods.py --dataset ADNI --model resnet --seed 0
-python -u src/explain/vismethods.py --dataset ADNI --model resnet --baseline --seed 0
-python -u src/explain/vismethods.py --dataset ADNI --model resnet --baseline --attribute --seed 0
+python -m explain.vismethods --dataset ADNI --model resnet --seed 0
+python -m explain.vismethods --dataset ADNI --model resnet --baseline --seed 0
+python -m explain.vismethods --dataset ADNI --model resnet --baseline --attribute --seed 0
 
-python -u src/explain/save_attributions.py --dataset ADNI --model resnet --seed 0
-python -u src/explain/save_attributions.py --dataset ADNI --model resnet --baseline --seed 0
-python -u src/explain/save_attributions.py --dataset ADNI --model resnet --baseline --attribute --seed 0
+python -m explain.save_attributions --dataset ADNI --model resnet --seed 0
+python -m explain.save_attributions --dataset ADNI --model resnet --baseline --seed 0
+python -m explain.save_attributions --dataset ADNI --model resnet --baseline --attribute --seed 0
 ```
 
 ### 3D: extract atlas-based regional ranks
 
 ```bash
-python -u src/explain/attribution_statistics.py \
+python -m explain.attribution_statistics \
   --dataset ADNI \
   --model resnet \
   --partition atlas \
   --regions 96 \
   --seed 0
-python -u src/explain/attribution_statistics.py \
+python -m explain.attribution_statistics \
   --dataset ADNI \
   --model resnet \
   --baseline \
   --partition atlas \
   --regions 96 \
   --seed 0
-python -u src/explain/attribution_statistics.py \
+python -m explain.attribution_statistics \
   --dataset ADNI \
   --model resnet \
   --baseline \

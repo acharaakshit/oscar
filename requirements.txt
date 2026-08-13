@@ -11,7 +11,6 @@ pandas==2.2.3
 pillow==11.1.0
 python-dotenv==1.2.1
 PyYAML==6.0.2
-SimpleITK==2.4.1
 SimpleITK==2.5.3
 scikit-image==0.25.2
 scikit-learn==1.6.1

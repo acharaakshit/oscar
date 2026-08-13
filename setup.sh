@@ -1,2 +1,2 @@
-export PROJECTDIR="~/fairness/oscar/"
-export PREFIX="/data/username/"
+export PROJECTDIR="$(pwd)"
+export PREFIX="/absolute/path/to/datasets"

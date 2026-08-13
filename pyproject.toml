@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oscar-shortcut"
+version = "0.1.0"
+description = "OSCAR shortcut-learning datasets, models, training, and attribution utilities."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = [
+    "create_splits",
+    "data",
+    "datasets2d",
+    "evaluation",
+    "evaluation_2d",
+    "evaluation_2d_samples_exp",
+    "groupdro",
+    "models",
+    "probing",
+    "probing_2d",
+    "train",
+    "train_2d",
+    "train_2d_samples_exp",
+    "utils",
+    "vismethods_2d",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["explain*"]
+namespaces = true

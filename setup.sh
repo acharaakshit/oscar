@@ -1,2 +1,2 @@
-export PROJECTDIR="~/fairness/attribute_pred/"
+export PROJECTDIR="~/fairness/oscar/"
 export PREFIX="/data/username/"

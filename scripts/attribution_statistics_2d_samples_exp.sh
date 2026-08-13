@@ -16,7 +16,7 @@ for i in {0..0}; do
                     for region in "${regions[@]}"; do
                         for n_samples in "${!bias_samples_train[@]}"; do
                             echo "${dataset}_${model}_biased_$method_$i"
-                            PYTHONPATH=$projectroot/src python3 -u $projectroot/src/explain_2d/attribution_statistics_samples_exp.py \
+                            python3 -u -m explain_2d.attribution_statistics_samples_exp \
                                 --dataset $dataset --model $model --method $method --seed $i --partition_method $partition \
                                 --regions $region --bias-samples-train ${bias_samples_train[n_samples]} \
                             --bias-samples-val ${bias_samples_val[n_samples]}

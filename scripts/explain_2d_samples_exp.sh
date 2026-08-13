@@ -11,7 +11,7 @@ for i in {0..0}; do
             for method in "${methods[@]}"; do
                 for n_samples in "${!bias_samples_train[@]}"; do
                     echo "${dataset}_${model}_biased_$method"
-                    PYTHONPATH=$projectroot/src python3 -u $projectroot/src/explain_2d/vismethods.py --dataset $dataset --model $model \
+                    python3 -u -m explain_2d.vismethods --dataset $dataset --model $model \
                         --method $method --seed $i --bias-samples-train ${bias_samples_train[n_samples]} \
                             --bias-samples-val ${bias_samples_val[n_samples]}
                 done

@@ -10,17 +10,17 @@ for i in {0..0}; do
     for model in "${models[@]}"; do
         for dataset in "${datasets[@]}"; do
             echo "${dataset}_${model}_baseline"
-            PYTHONPATH=$projectroot python3 -u $projectroot/src/evaluation_2d.py --dataset $dataset \
+            python3 -u -m evaluation_2d --dataset $dataset \
                 --model $model --checkpoint  "${dataset}_${model}_baseline" \
                 --mode eval --in-channels 3 --baseline --seed $i
 
             echo "${dataset}_${model}_biased"
-            PYTHONPATH=$projectroot python3 -u $projectroot/src/evaluation_2d.py --dataset $dataset \
+            python3 -u -m evaluation_2d --dataset $dataset \
                 --model $model --checkpoint  "${dataset}_${model}_biased" \
                 --mode eval --in-channels 3 --seed $i 
         
             echo "${dataset}_${model}_attribute"
-            PYTHONPATH=$projectroot python3 -u $projectroot/src/evaluation_2d.py --dataset $dataset \
+            python3 -u -m evaluation_2d --dataset $dataset \
                 --model $model --checkpoint  "${dataset}_${model}_attribute" \
                 --mode eval --in-channels 3 --baseline --attribute --seed $i
 

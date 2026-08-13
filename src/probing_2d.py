@@ -133,7 +133,7 @@ def main(args):
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model.to(device)
+    model.to(device=device, dtype=torch.float32)
     model.eval()
     train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=False, num_workers=16)
     test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=16)
@@ -165,9 +165,10 @@ def main(args):
     all_feats = []
     preds = []
     preds_clean = []
+    pred_logits = []
     with torch.no_grad():
         for batch in tqdm(test_dataloader):
-            x = batch[0].to(device)
+            x = batch[0].to(device=device, dtype=torch.float32)
             feats = model.model.forward_features(x)
             penult = model.model.forward_head(feats, pre_logits=True)
             all_feats.append(penult.cpu())
@@ -175,11 +176,23 @@ def main(args):
             z_clean = remove_A_direction(z)
             yhat_clean = model.model.fc(torch.from_numpy(z_clean).to(device=device, dtype=torch.float32)).cpu().numpy()
             yhat = model.model.fc(torch.from_numpy(z).to(device=device, dtype=torch.float32)).cpu().numpy()
+            pred_logits.append(yhat)
             preds_clean += [np.argmax(yhat_clean, axis=-1)]
             preds += [np.argmax(yhat, axis=-1)]
 
     X_test = torch.cat(all_feats, dim=0).numpy()
     a_test = test_dataset.attributes.numpy()
+
+    output_dir = os.path.join(PREFIX, dataset, 'latents')
+    os.makedirs(output_dir, exist_ok=True)
+    np.savez(
+        os.path.join(output_dir, f'{dataset}_{model_name}_{baseline}_{bias_samples_train}_seed_{seed}.npz'),
+        test={
+            'pred_logits': np.stack(pred_logits).astype(np.float32, copy=False),
+            'targets': test_dataset.labels.cpu().numpy(),
+            'attrs': test_dataset.attributes.cpu().numpy(),
+        },
+    )
 
     a_pred = clf.predict_proba(X_test)[:, 1]
     auc = roc_auc_score(a_test, a_pred)

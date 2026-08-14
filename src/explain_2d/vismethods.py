@@ -17,6 +17,24 @@ from zennit.composites import EpsilonPlusFlat
 from lxt.efficient import monkey_patch, monkey_patch_zennit
 import importlib
 
+import sys
+from pathlib import Path
+
+
+# do: git clone https://github.com/vaynexie/CausalX-ViT.git and adjust the path below
+repoCX = Path("~/fairness/CausalX-ViT")
+
+sys.path.insert(0, str(repoCX / "ViT_CX"))
+sys.path.insert(0, str(repoCX / "ViT_CX" / "py_cam"))
+
+# do: git clone https://github.com/aenglebert/Transformer_Input_Sampling.git and adjust the path below
+repoCX = Path("~/fairness/Transformer_Input_Sampling")
+
+sys.path.insert(0, str(repoCX))
+
+from ViT_CX import ViT_CX, reshape_function_vit
+from tis import TIS
+
 logging.basicConfig(level=logging.INFO)
 
 def main(args):
@@ -149,8 +167,8 @@ def main(args):
             savep = os.path.join(OUTPUT_DIR, f"{image_id}_{model_name}_{baseline}_{attribute}_{method}_seed_{seed}_{bias_samples_train}_{bias_samples_val}.npz")
         else:
             savep = os.path.join(OUTPUT_DIR, f"{image_id}_{model_name}_{baseline}_{attribute}_{method}_seed_{seed}.npz")
-        
-        if os.path.exists(savep):
+
+        if os.path.exists(savep) and method not in {"CX", "TiS"}:
             continue
 
         with torch.no_grad():
@@ -193,6 +211,25 @@ def main(args):
         elif method == 'Saliency':
             attribution_handle = Saliency(model)
             attribution_map = attribution_handle.attribute(inputs, target=outputs)
+        elif method == 'CX':
+            assert model_name == 'vit', "only works for vit"
+            attribution_map = ViT_CX(
+                model=model,
+                image=inputs,                  # [1, 3, H, W]
+                target_layer=model.model.encoder.layers[-1].ln_1,
+                target_category=outputs, #None,                # None = top-1 class
+                reshape_function=reshape_function_vit,
+                gpu_batch=5000,
+            )
+            np.savez_compressed(savep, array=attribution_map)
+            continue
+        elif method == 'TiS':
+            saliency_method = TIS(model.model, batch_size=512)
+            attribution_map = saliency_method(inputs, 
+                    class_idx=outputs
+                    ).cpu()
+            np.savez_compressed(savep, array=attribution_map)
+            continue
         else:
             raise ValueError('Method not supported yet!')
         

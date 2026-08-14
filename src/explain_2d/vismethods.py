@@ -221,13 +221,16 @@ def main(args):
                 reshape_function=reshape_function_vit,
                 gpu_batch=5000,
             )
+            attribution_map = np.maximum(attribution_map,0.0)
             np.savez_compressed(savep, array=attribution_map)
             continue
         elif method == 'TiS':
+            # already non-negative
             saliency_method = TIS(model.model, batch_size=512)
             attribution_map = saliency_method(inputs, 
                     class_idx=outputs
                     ).cpu()
+            attribution_map = torch.relu(attribution_map)
             np.savez_compressed(savep, array=attribution_map)
             continue
         else:

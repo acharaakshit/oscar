@@ -31,24 +31,21 @@ At a high level, OSCAR works as follows:
 
 ## Repository scope
 
-The paper covers CelebA, CheXpert, and ADNI. The code in this repository currently maps to those experiments as follows:
+The datasets used in OSCAR are CelebA, CheXpert, and ADNI. The repository broadly covers the following experiments:
 
-- `2D`: CelebA and CheXpert experiments, including model training, attribution generation, region-wise rank construction, correlation analysis, and RCS-based mitigation.
-- `3D`: ADNI experiments, including model training, attribution generation, registration to atlas space, and atlas-based rank construction.
-- `Partition support`:
-  - `2D`: the paper experiments use regular grid partitions and superpixel partitions for attribution rank extraction in [`src/explain_2d/attribution_statistics.py`](src/explain_2d/attribution_statistics.py).
-  - `3D`: the ADNI workflow uses atlas-based partitions in [`src/explain/attribution_statistics.py`](src/explain/attribution_statistics.py).
+- `2D`: CelebA and CheXpert experiments, including model training, attribution computation, region-wise rank construction, correlation analysis, and RCS-based mitigation.
+- `3D`: ADNI experiments, including model training, attribution computation, registration to atlas space, and atlas-based rank construction.
 
 ## Layout
 
 ```text
 config/                  YAML config for folders, tasks, and model aliases
 docs/DATASET_SETUP.md    Dataset preparation details
-process/                 MRI metadata creation and volume preprocessing, Waterbirds generation
-scripts/                 Example shell wrappers
+process/                 MRI metadata creation and volume preprocessing, Waterbirds construction
+scripts/                 Example scripts for running different experiments
 src/train*.py            2D/3D model training
 src/evaluation*.py       2D/3D evaluation and 2D mitigation
-src/explain*/            Attribution generation, partitions, rank extraction
+src/explain*/            Attribution computation, partitions, rank extraction
 src/vismethods_2d.py     2D OSCAR correlation and RCS computation
 ```
 
@@ -68,27 +65,21 @@ source setup.sh
 
 Notes:
 
-- `PREFIX` is the root folder path that holds dataset folders, checkpoints, attribution maps, and results.
+- `PREFIX` is the root folder path where the dataset folders, checkpoints, attribution maps, and results are stored.
 - `PROJECTDIR` is the repository root used by scripts to find config files. Edit `setup.sh` to set your project root and data root.
 
 ## Datasets
 
 ### 2D experiments
 
-- `celeba_gender`: Blond Hair as task, Male as sensitive attribute.
-- `chexpert_pleuraleffusiongender`: Pleural Effusion as task, Sex as sensitive attribute.
-
-The loaders live in [`src/datasets2d.py`](src/datasets2d.py). They construct:
-
-- a balanced `BA` split when `--baseline` is set
-- a sensitive-attribute `SA` training set when `--baseline --attribute` is set
-- a shortcut-prone `TS` split otherwise
+- `celeba_gender`: Blond / Non-Blond Hair as task label, Sex (Male/Female) as sensitive attribute.
+- `chexpert_pleuraleffusiongender`: Pleural Effusion / No Pleural Effusion  as task label, Sex (Male/Female) as sensitive attribute.
 
 ### 3D experiments
 
 - `ADNI` is the main 3D path in the current repo.
 
-The MRI preprocessing and metadata pipeline is driven by:
+The MRI preprocessing and metadata pipeline are provided in:
 
 - [`process/metadata.py`](process/metadata.py)
 - [`process/create_data_objects.py`](process/create_data_objects.py)
@@ -106,9 +97,9 @@ python -m train_2d --dataset celeba_gender --model resnet --baseline --in-channe
 python -m train_2d --dataset celeba_gender --model resnet --baseline --attribute --in-channels 3 --batch-size 32 --seed 0
 ```
 
-For the varying-shortcut-strength experiments used in the paper, use [`src/train_2d_samples_exp.py`](src/train_2d_samples_exp.py) with `--bias-samples-train` and `--bias-samples-val`.
+For training models with varying-shortcut-strength, use [`src/train_2d_samples_exp.py`](src/train_2d_samples_exp.py) with `--bias-samples-train` and `--bias-samples-val`.
 
-### 2D: generate attribution maps
+### 2D: compute attribution maps
 
 ```bash
 python -m explain_2d.vismethods --dataset celeba_gender --model resnet --method GradCAM --seed 0
@@ -116,10 +107,12 @@ python -m explain_2d.vismethods --dataset celeba_gender --model resnet --baselin
 python -m explain_2d.vismethods --dataset celeba_gender --model resnet --baseline --attribute --method GradCAM --seed 0
 ```
 
-Supported attribution methods in the checked-in 2D pipeline are:
+Attribution methods used for the 2D models/images are:
 
-- `GradCAM`
-- `LRP`
+- [`GradCAM`](https://captum.ai/api/layer.html#gradcam) for `ResNet`
+- [`LRP`](https://github.com/chr5tphr/zennit) for `ResNet`, [`AttnLRP`](https://github.com/rachtibat/LRP-eXplains-Transformers) for `ViT`
+- [`ViT-CX`](https://github.com/vaynexie/CausalX-ViT) for `ViT`
+- [`TiS`](https://github.com/aenglebert/Transformer_Input_Sampling) for `ViT`
 
 ### 2D: convert attribution maps to regional rank profiles
 
@@ -139,27 +132,16 @@ Repeat for:
 - `BA`: `--baseline`
 - `SA`: `--baseline --attribute`
 
-In the 2D experiments, the paper-style regional partitions correspond to:
+In the 2D experiments, the partitions are:
 
 - `grid`: `64` regions corresponds to an `8 × 8` grid, and `256` regions corresponds to a `16 × 16` grid
 - `superpixel`: `64` and `256` regions correspond to superpixel partitions with the same numbers of regions
-
-The checked-in 2D correlation sweep in [`src/vismethods_2d.py`](src/vismethods_2d.py) currently iterates over:
-
-- `grid`
-- `superpixel`
 
 ### 2D: compute OSCAR correlations and RCS
 
 ```bash
 python -m vismethods_2d --outfile celeba_resnet --seeds 1
 ```
-
-Important:
-
-- [`src/vismethods_2d.py`](src/vismethods_2d.py) interprets `--seeds N` as a count and iterates over seeds `0..N-1`.
-- The script writes correlation summaries and per-region contribution scores to `results/`.
-- The analysis computes pairwise correlations, partial correlations, a deviation-style semipartial correlation, and per-region RCS values.
 
 ### 2D: evaluation and mitigation
 
@@ -241,17 +223,6 @@ python -m explain.attribution_statistics \
   --regions 96 \
   --seed 0
 ```
-
-## Example scripts
-
-The shell files under [`scripts/`](scripts/) are contains some example scripts:
-
-- [`scripts/train_scut.sh`](scripts/train_scut.sh)
-- [`scripts/train_scut_2d.sh`](scripts/train_scut_2d.sh)
-- [`scripts/explain.sh`](scripts/explain.sh)
-- [`scripts/explain_2d.sh`](scripts/explain_2d.sh)
-- [`scripts/attribution_statistics.sh`](scripts/attribution_statistics.sh)
-- [`scripts/attribution_statistics_2d.sh`](scripts/attribution_statistics_2d.sh)
 
 ## Citations
 

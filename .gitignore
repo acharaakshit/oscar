@@ -8,3 +8,6 @@ results
 */**__pycache__
 */**/**__pycache__
 */**.egg-info
+
+# ADNI data is not allowed to be shared
+docs/splits/*adni*

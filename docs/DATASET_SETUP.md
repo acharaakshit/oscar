@@ -19,6 +19,8 @@ Repeat for `--FS 1.5T` where applicable.
 
 ## 3D Datasets
 
+Please refer to the respective data use terms for each dataset before using it.
+
 ### [ADNI](https://ida.loni.usc.edu/home/projectPage.jsp?project=ADNI) (multifield: 3T, 1.5T)
 - Preprocessed scans: `PREFIX/ADNI_<FS>/preprocessed/**/<IMAGE_ID>_MNI_Brain.nii.gz`.
 - Required metadata: the main ADNI report CSV, `race.csv` (from LONI), and the field-strength CSV (`ADNI_<FS>.csv`) in `PREFIX/ADNI_<FS>/`.
@@ -26,6 +28,7 @@ Repeat for `--FS 1.5T` where applicable.
 ### [OASIS](https://sites.wustl.edu/oasisbrains/home/oasis-3/) (multifield: 3T, 1.5T)
 - Preprocessed scans + JSON with `MagneticFieldStrength` in `PREFIX/OASIS_<FS>/preprocessed/` (filenames like `<SUBJECT>_MNI_Brain.nii.gz`).
 - Metadata: `metadata.csv`, `cognition.csv`, `healthy.csv` in `PREFIX/OASIS_<FS>/`.
+- [OASIS-3 image IDs used for the gender experiment](splits/invisible_oasis_splits.csv).
 
 ### [IXI](https://brain-development.org/ixi-dataset/) (multifield: 3T, 1.5T)
 - Preprocessed scans `PREFIX/IXI_<FS>/preprocessed/*Brain.nii.gz`.
@@ -34,6 +37,7 @@ Repeat for `--FS 1.5T` where applicable.
 ### [HCP](https://www.humanconnectome.org/study/hcp-young-adult/data-releases) (3T)
 - Raw structure: `PREFIX/HCP/<SUBJECT>/T1w/T1w_acpc_dc_restore_brain.nii.gz`.
 - Metadata: `metadata.csv` (public) and `metadata_restricted.csv` (restricted and used for age and race) in `PREFIX/HCP_3T/`.
+- [HCP image IDs used for the gender experiment](splits/invisible_hcp_splits.csv).
 
 ### [A4](https://www.a4studydata.org/) (3T)
 - Preprocessed scans + JSON in `PREFIX/A4_3T/preprocessed/` (filenames include visit code, end with `MNI_Brain.nii.gz`).

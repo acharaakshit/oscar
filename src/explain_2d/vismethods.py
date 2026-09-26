@@ -1,4 +1,8 @@
-from datasets2d import get_biased_celeba_splits, get_biased_chexpert_splits
+from datasets2d import (
+    get_biased_celeba_splits,
+    get_biased_chexpert_splits,
+    get_biased_multiattribute_celeba_splits,
+)
 from tqdm import tqdm
 import numpy as np
 import torch
@@ -53,6 +57,11 @@ def main(args):
     seed = args.seed
     bias_samples_train = args.bias_samples_train
     bias_samples_val = args.bias_samples_val
+    multilabel_sa = (
+        dataset == 'celeba_gender_multiattr'
+        and baseline
+        and attribute
+    )
 
     # read folders yaml file
     with open(f'{PROJECT_ROOT}/config/folder.yaml') as f:
@@ -71,7 +80,19 @@ def main(args):
 
     model_alias = models[model_name]
     
-    if bias_samples_train and bias_samples_val:
+    if dataset == 'celeba_gender_multiattr':
+        if not baseline:
+            checkpoint_role = output_role = "ts"
+        elif multilabel_sa:
+            checkpoint_role = "sa_multilabel"
+            output_role = f"sa_multilabel_{args.sa_attribute.lower()}"
+        else:
+            checkpoint_role = output_role = "ba"
+        checkpoint_name = (
+            f"MODEL_{model_name}_{in_channels}_SEED2D_{seed}_"
+            f"MULTIATTR_{checkpoint_role}_F1.ckpt"
+        )
+    elif bias_samples_train and bias_samples_val:
         checkpoint_name = f'MODEL_{model_name}_{in_channels}_' + f"SEED2D_{seed}_BASELINE_{baseline}_{attribute}_{bias_samples_train}_{bias_samples_val}_F1.ckpt" 
     else:    
         checkpoint_name = f'MODEL_{model_name}_{in_channels}_' + f"SEED2D_{seed}_BASELINE_{baseline}_{attribute}_F1.ckpt" 
@@ -101,6 +122,12 @@ def main(args):
                                             val_samples=500,
                                             attr_labs=attr_labs,
                                         )
+    elif dataset == 'celeba_gender_multiattr':
+        _, _, test_dataset = get_biased_multiattribute_celeba_splits(
+                                            root=PREFIX,
+                                            balanced=baseline,
+                                            attr_labs=attr_labs,
+                                        )
     else:
         raise ValueError("Incorrect dataset passed")
 
@@ -111,7 +138,8 @@ def main(args):
                             model_alias=model_alias,
                             num_classes=2,
                             lr=1e-4,
-                            img_size=img_size
+                            img_size=img_size,
+                            multilabel=multilabel_sa,
                         )
     
     model.eval()
@@ -163,7 +191,13 @@ def main(args):
         labels = batch[1].to(device)
         assert len(batch) == 2
         image_id = idx
-        if bias_samples_train and bias_samples_val:
+        if dataset == 'celeba_gender_multiattr':
+            savep = os.path.join(
+                OUTPUT_DIR,
+                f"{image_id}_{model_name}_MULTIATTR_{output_role}_{method}_"
+                f"seed_{seed}.npz",
+            )
+        elif bias_samples_train and bias_samples_val:
             savep = os.path.join(OUTPUT_DIR, f"{image_id}_{model_name}_{baseline}_{attribute}_{method}_seed_{seed}_{bias_samples_train}_{bias_samples_val}.npz")
         else:
             savep = os.path.join(OUTPUT_DIR, f"{image_id}_{model_name}_{baseline}_{attribute}_{method}_seed_{seed}.npz")
@@ -172,12 +206,21 @@ def main(args):
             continue
 
         with torch.no_grad():
-            outputs = model(inputs).argmax(dim=1).item()
+            logits = model(inputs)
+            if multilabel_sa:
+                target_attribute = 0 if args.sa_attribute == "Male" else 1
+                target_class = logits[0, target_attribute].argmax().item()
+                captum_target = (target_attribute, target_class)
+            else:
+                target_class = logits.argmax(dim=1).item()
+                captum_target = target_class
 
 
         if method == 'GradCAM':
             attribution_handle = LayerGradCam(model, target_layer)
-            attribution_map = attribution_handle.attribute(inputs, target=outputs, relu_attributions=True)
+            attribution_map = attribution_handle.attribute(
+                inputs, target=captum_target, relu_attributions=True
+            )
         elif method == "LRP":
             x = inputs.detach().requires_grad_(True)
             if 'vit' in model_name:
@@ -195,7 +238,10 @@ def main(args):
                 logits = model(x)
                 handle.remove()
 
-                logit = logits[0, outputs]
+                if multilabel_sa:
+                    logit = logits[0, target_attribute, target_class]
+                else:
+                    logit = logits[0, target_class]
                 model.zero_grad(set_to_none=True)
                 logit.backward()
 
@@ -205,19 +251,27 @@ def main(args):
                 composite = EpsilonPlusFlat(canonizers=canonizers)
                 with Gradient(model, composite) as attr:
                     logits = model(x)
-                    one_hot = torch.zeros_like(logits).scatter_(1, torch.tensor([[outputs]], device=device), 1.0)
+                    one_hot = torch.zeros_like(logits)
+                    if multilabel_sa:
+                        one_hot[0, target_attribute, target_class] = 1.0
+                    else:
+                        one_hot[0, target_class] = 1.0
                     _, relevance = attr(x, one_hot)
                 attribution_map = torch.relu(relevance.sum(1, keepdim=True))
         elif method == 'Saliency':
             attribution_handle = Saliency(model)
-            attribution_map = attribution_handle.attribute(inputs, target=outputs)
+            attribution_map = attribution_handle.attribute(
+                inputs, target=captum_target
+            )
         elif method == 'CX':
+            if multilabel_sa:
+                raise ValueError("We don't use CX for the multi-attribute SA model")
             assert model_name == 'vit', "only works for vit"
             attribution_map = ViT_CX(
                 model=model,
                 image=inputs,                  # [1, 3, H, W]
                 target_layer=model.model.encoder.layers[-1].ln_1,
-                target_category=outputs, #None,                # None = top-1 class
+                target_category=target_class, #None,                # None = top-1 class
                 reshape_function=reshape_function_vit,
                 gpu_batch=5000,
             )
@@ -225,10 +279,12 @@ def main(args):
             np.savez_compressed(savep, array=attribution_map)
             continue
         elif method == 'TiS':
+            if multilabel_sa:
+                raise ValueError("We don't use TiS for the multi-attribute SA model")
             # already non-negative
             saliency_method = TIS(model.model, batch_size=512)
             attribution_map = saliency_method(inputs, 
-                    class_idx=outputs
+                    class_idx=target_class
                     ).cpu()
             attribution_map = torch.relu(attribution_map)
             np.savez_compressed(savep, array=attribution_map)
@@ -249,6 +305,7 @@ if __name__=="__main__":
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--baseline", type=bool, action=argparse.BooleanOptionalAction)
     parser.add_argument("--attribute", type=bool, action=argparse.BooleanOptionalAction)
+    parser.add_argument("--sa-attribute", choices=("Male", "Smiling"), default="Male")
     parser.add_argument("--bias-samples-train", type=int, default=None)
     parser.add_argument("--bias-samples-val", type=int, default=None)
     # Parse the arguments

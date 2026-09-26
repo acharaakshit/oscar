@@ -7,7 +7,11 @@ from tqdm import tqdm
 from scipy.stats import rankdata
 import pickle
 from scipy.ndimage import mean as region_mean
-from datasets2d import get_biased_celeba_splits, get_biased_chexpert_splits
+from datasets2d import (
+    get_biased_celeba_splits,
+    get_biased_chexpert_splits,
+    get_biased_multiattribute_celeba_splits,
+)
 from .partition import square_atlas_grid, kmeans_partition, build_ref_edge_image, superpixel_partition
 from .utils import saliency_score_percent
 from sklearn.model_selection import StratifiedKFold
@@ -29,6 +33,11 @@ def main(args):
     spearman = args.spearman
     saliency = args.saliency
     attenuation = args.attenuation
+    multilabel_sa = (
+        dataset == 'celeba_gender_multiattr'
+        and baseline
+        and attribute
+    )
 
 
     assert not (spearman and saliency), "both spearman and saliency can't be true"
@@ -68,6 +77,12 @@ def main(args):
                                             val_samples=500,
                                             attr_labs=attr_labs,
                                         )
+    elif dataset == 'celeba_gender_multiattr':
+        _, _, test_dataset = get_biased_multiattribute_celeba_splits(
+                                            root=PREFIX,
+                                            balanced=baseline,
+                                            attr_labs=attr_labs,
+                                        )
     else:
         raise ValueError("Incorrect dataset passed")
 
@@ -79,7 +94,7 @@ def main(args):
         N = len(test_dataset)
         y   = test_dataset.labels.cpu().numpy().astype(int)
         attr = test_dataset.attributes.cpu().numpy().astype(int)
-        joint = y * 10 + attr # just a unique code as 1,0 and 0,1 will be same
+        joint = y * 4 + attr[:, 0] * 2 + attr[:, 1] if attr.ndim == 2 else y * 10 + attr
         skf = StratifiedKFold(n_splits=4, shuffle=True, random_state=42)
 
         folds = []
@@ -94,7 +109,16 @@ def main(args):
     else:
         attenuation_string = ''
 
-    label = f'{dataset}_{model_name}_{baseline}_{attribute}_{method}__partition_{partition_method}_regions_{regions}_seed_{seed}{attenuation_string}'
+    if dataset == 'celeba_gender_multiattr':
+        if not baseline:
+            model_role = "ts"
+        elif multilabel_sa:
+            model_role = f"sa_multilabel_{args.sa_attribute.lower()}"
+        else:
+            model_role = "ba"
+        label = f'{dataset}_{model_name}_MULTIATTR_{model_role}_{method}__partition_{partition_method}_regions_{regions}_seed_{seed}{attenuation_string}'
+    else:
+        label = f'{dataset}_{model_name}_{baseline}_{attribute}_{method}__partition_{partition_method}_regions_{regions}_seed_{seed}{attenuation_string}'
 
     SAVEDIR = os.path.join(PREFIX, dataset, RESULTS_DIR)
     os.makedirs(SAVEDIR, exist_ok=True)
@@ -115,14 +139,16 @@ def main(args):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     partition_path = os.path.join(PREFIX, dataset, f"{partition_method}_{model_name}_regions_{regions}.npy")
-    assert regions in [64,256], "regions can only be 64 or 256 for 2D"
+    assert regions in [64,256,3136], "regions can only be 64, 256, or 3136 for 2D"
     if not os.path.exists(partition_path):
         logging.info(f"Computing the partitions!")
         if partition_method == 'grid':
             if regions == 64:
                 grid = (8, 8)
-            else:
+            elif regions == 256:
                 grid = (16, 16)
+            else:
+                grid = (56, 56)
             atlas = square_atlas_grid(size=(224,224), grid=grid)
         elif partition_method == 'kmeans':
             atlas = kmeans_partition(size=(224,224), parts=regions)
@@ -152,7 +178,14 @@ def main(args):
 
 
         image_id = gidx
-        savep = os.path.join(OUTPUT_DIR, f"{image_id}_{model_name}_{baseline}_{attribute}_{method}_seed_{seed}.npz")
+        if dataset == 'celeba_gender_multiattr':
+            savep = os.path.join(
+                OUTPUT_DIR,
+                f"{image_id}_{model_name}_MULTIATTR_{model_role}_{method}_"
+                f"seed_{seed}.npz",
+            )
+        else:
+            savep = os.path.join(OUTPUT_DIR, f"{image_id}_{model_name}_{baseline}_{attribute}_{method}_seed_{seed}.npz")
 
         if not os.path.isfile(savep):
             logging.info(f"{savep} doesn't exist")
@@ -191,6 +224,7 @@ if __name__=="__main__":
     parser.add_argument("--regions", type=int, default=64)
     parser.add_argument("--baseline", type=bool, action=argparse.BooleanOptionalAction)
     parser.add_argument("--attribute", type=bool, action=argparse.BooleanOptionalAction)
+    parser.add_argument("--sa-attribute", choices=("Male", "Smiling"), default="Male")
     parser.add_argument("--spearman", type=bool, action=argparse.BooleanOptionalAction)
     parser.add_argument("--saliency", type=bool, action=argparse.BooleanOptionalAction)
     parser.add_argument("--attenuation", type=int, default=0)

@@ -239,6 +239,119 @@ def get_biased_celeba_splits(
     
     return train_dataset, val_dataset, test_dataset
 
+
+def get_biased_multiattribute_celeba_splits(
+        root: str,
+        balanced: bool,
+        attr_labs: bool = False,
+    ) -> tuple[Dataset, Dataset, Dataset]:
+    train_full = _CelebA(root, split="train", target_type="attr", download=True)
+    val_full = _CelebA(root, split="valid", target_type="attr", download=True)
+    test_full = _CelebA(root, split="test", target_type="attr", download=True)
+    full_dataset = ConcatDataset([train_full, val_full, test_full])
+    all_attributes = np.vstack([
+        train_full.attr.numpy(),
+        val_full.attr.numpy(),
+        test_full.attr.numpy(),
+    ])
+    name2i = {name: i for i, name in enumerate(train_full.attr_names)}
+    labels = all_attributes[:, name2i["Blond_Hair"]]
+    male = all_attributes[:, name2i["Male"]]
+    smiling = all_attributes[:, name2i["Smiling"]]
+    indices = np.arange(len(labels))
+    groups = {
+        (y, m, s): indices[(labels == y) & (male == m) & (smiling == s)]
+        for y in (0, 1)
+        for m in (0, 1)
+        for s in (0, 1)
+    }
+
+    def make_pool(seed, source_groups):
+        rng = np.random.default_rng(seed)
+        return {
+            key: [rng.permutation(values), 0]
+            for key, values in source_groups.items()
+        }
+
+    def take(pool, key, count):
+        values, start = pool[key]
+        stop = start + count
+        if stop > len(values):
+            raise ValueError(
+                f"Cell {key} needs {count} more examples, but only "
+                f"{len(values) - start} remain"
+            )
+        pool[key][1] = stop
+        return values[start:stop]
+
+    def take_balanced(pool, count):
+        per_cell = count // 8
+        selected = [
+            take(pool, (y, m, s), per_cell)
+            for y in (0, 1)
+            for m in (0, 1)
+            for s in (0, 1)
+        ]
+        return np.sort(np.concatenate(selected))
+
+    def take_biased(pool, count):
+        per_label = count // 2
+        # independent 90% gender and 80% smiling alignment
+        allocations = per_label * np.array([36, 9, 4, 1]) // 50
+        alignment_states = (
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False),
+        )
+        selected = []
+        for y in (0, 1):
+            for (male_aligned, smiling_aligned), cell_count in zip(
+                    alignment_states, allocations):
+                m = 1 - y if male_aligned else y
+                s = y if smiling_aligned else 1 - y
+                selected.append(take(pool, (y, m, s), int(cell_count)))
+        return np.sort(np.concatenate(selected))
+
+    # reserve the shared balanced test set before sampling train and validation
+    test_pool = make_pool(0, groups)
+    test_idxs = take_balanced(test_pool, 1000)
+    remaining = {
+        key: values[~np.isin(values, test_idxs)]
+        for key, values in groups.items()
+    }
+    pool = make_pool(1, remaining)
+    if balanced:
+        val_idxs = take_balanced(pool, 800)
+        train_idxs = take_balanced(pool, 4000)
+    else:
+        val_idxs = take_biased(pool, 800)
+        train_idxs = take_biased(pool, 4000)
+
+    selected_attribute = np.column_stack([male, smiling])
+
+    def build_dataset(split_indices):
+        dataset = BiasedCelebADataset(
+            base_dataset=full_dataset,
+            indices=split_indices,
+            task_labels=labels[split_indices],
+            attribute_labels=selected_attribute[split_indices],
+            attr_labs=attr_labs,
+            attribute_name="Male+Smiling",
+            label_name="Blond_Hair",
+        )
+        # keep both attributes for intersection evaluation
+        dataset.male_attributes = torch.from_numpy(male[split_indices]).long()
+        dataset.smiling_attributes = torch.from_numpy(
+            smiling[split_indices]
+        ).long()
+        return dataset
+
+    return tuple(
+        build_dataset(split_indices)
+        for split_indices in (train_idxs, val_idxs, test_idxs)
+    )
+
 class CheXpertShortcutDataset(Dataset):
     def __init__(
             self,

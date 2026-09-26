@@ -27,6 +27,7 @@ class Classifier2D(L.LightningModule):
                 down: float = 2,
                 random_shuffle: bool = False,
                 shuffle_seed: int = 0,
+                multilabel: bool = False,
                 ):
         super().__init__()
 
@@ -40,6 +41,8 @@ class Classifier2D(L.LightningModule):
         self.down = down
         self.shuffle = random_shuffle
         self.shuffle_seed = shuffle_seed
+        self.multilabel = multilabel
+        self.output_classes = self.num_classes * 2 if self.multilabel else self.num_classes
         self.shuffle_gen = None  # lazily created per device in forward
 
         if self.use_rcs_consistency:
@@ -55,13 +58,13 @@ class Classifier2D(L.LightningModule):
             # build ViT-B/16 from torchvision
             self.model = vit_b_16(weights=weights, image_size=img_size, dropout=0.1)
             in_feats = self.model.heads.head.in_features
-            if self.model.heads.head.out_features != num_classes:
-                self.model.heads.head = nn.Linear(in_feats, num_classes)
+            if self.model.heads.head.out_features != self.output_classes:
+                self.model.heads.head = nn.Linear(in_feats, self.output_classes)
     
         elif 'swin' in model_alias.lower():
             self.model = timm.create_model(
                 model_alias,
-                num_classes=self.num_classes,
+                num_classes=self.output_classes,
                 in_chans=self.in_channels,
                 img_size=self.img_size,
                 drop_rate=0.2,
@@ -70,14 +73,16 @@ class Classifier2D(L.LightningModule):
         else:
             self.model = timm.create_model(
                 model_alias,
-                num_classes=self.num_classes,
+                num_classes=self.output_classes,
                 in_chans=self.in_channels,
                 drop_rate=0.2,
                 pretrained=True,
             )
         
 
-        self.fscore = F1Score(task='multiclass', average='macro', num_classes=self.num_classes)
+        self.fscore = F1Score(
+            task='multiclass', average='macro', num_classes=self.num_classes
+        )
         self.loss_fn = nn.CrossEntropyLoss()
 
         self.lr = lr
@@ -85,7 +90,10 @@ class Classifier2D(L.LightningModule):
 
     def forward(self, x):
         if not self.use_rcs_consistency:
-            return self.model(x)
+            outputs = self.model(x)
+            if self.multilabel:
+                outputs = outputs.reshape(-1, self.num_classes, 2)
+            return outputs
 
         f = self.model.forward_features(x)
         if f.ndim != 4: 
@@ -118,21 +126,33 @@ class Classifier2D(L.LightningModule):
         w = 1.0 - m_norm * scale
         pooled = (f * w).sum((2, 3)) / (w.sum((2, 3)) + 1e-8)
 
-        return self.model.fc(pooled) 
+        outputs = self.model.fc(pooled)
+        if self.multilabel:
+            outputs = outputs.reshape(-1, self.num_classes, 2)
+        return outputs
 
 
     def training_step(self, batch, batch_idx):
         inputs, labels = batch
         outputs = self(inputs.to(torch.bfloat16))
-        loss = self.loss_fn(outputs, labels)
+        if self.multilabel:
+            loss = self.loss_fn(outputs.reshape(-1, 2), labels.reshape(-1))
+        else:
+            loss = self.loss_fn(outputs, labels)
         self.log("train_loss", loss, prog_bar=True, logger=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         inputs, labels = batch
         outputs = self(inputs.to(torch.bfloat16))
-        loss = self.loss_fn(outputs, labels)
-        self.fscore(outputs, labels)
+        if self.multilabel:
+            metric_inputs = outputs.reshape(-1, 2)
+            metric_labels = labels.reshape(-1)
+        else:
+            metric_inputs = outputs
+            metric_labels = labels
+        loss = self.loss_fn(metric_inputs, metric_labels)
+        self.fscore(metric_inputs, metric_labels)
         self.log("val_fscore", self.fscore, prog_bar=True, logger=True, sync_dist=True)
         self.log("val_loss", loss, prog_bar=True, logger=True, sync_dist=True)        
         return loss
@@ -148,7 +168,9 @@ class Classifier2D(L.LightningModule):
     def predict_step(self, batch, batch_idx):
         inputs, labels = batch
         preds = self.forward(inputs.to(torch.bfloat16))
-        if self.num_classes > 1:
+        if self.multilabel:
+            preds = torch.argmax(preds, dim=-1)
+        elif self.num_classes > 1:
             preds = torch.argmax(preds, dim=1)
         return preds, labels
 
